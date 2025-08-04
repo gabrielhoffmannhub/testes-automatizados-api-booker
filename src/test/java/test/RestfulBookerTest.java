@@ -42,8 +42,8 @@ public class RestfulBookerTest {
     public void deveCriarUmNovoBooking() {
         String corpoRequisicao = """
             {
-                "firstname" : "Gabriel",
-                "lastname" : "Severo",
+                "firstname" : "Cristiano",
+                "lastname" : "Ronaldo",
                 "totalprice" : 150,
                 "depositpaid" : true,
                 "bookingdates" : {
@@ -61,8 +61,8 @@ public class RestfulBookerTest {
                 .post("/booking")
                 .then()
                 .statusCode(200)
-                .body("booking.firstname", equalTo("Gabriel"))
-                .body("booking.lastname", equalTo("Severo"));
+                .body("booking.firstname", equalTo("Cristiano"))
+                .body("booking.lastname", equalTo("Ronaldo"));
     }
 
     @Test
@@ -79,8 +79,8 @@ public class RestfulBookerTest {
     public void deveCriarEexcluirUmBookingComToken() {
         String corpoRequisicao = """
             {
-                "firstname" : "Gabriel",
-                "lastname" : "Severino",
+                "firstname" : "Luan",
+                "lastname" : "Guilherme",
                 "totalprice" : 200,
                 "depositpaid" : false,
                 "bookingdates" : {
@@ -125,8 +125,8 @@ public class RestfulBookerTest {
     public void deveAtualizarBookingComToken() {
         String corpoCriacao = """
             {
-                "firstname" : "Maria",
-                "lastname" : "Oliveira",
+                "firstname" : "Neymar",
+                "lastname" : "Júnior",
                 "totalprice" : 180,
                 "depositpaid" : true,
                 "bookingdates" : {
@@ -160,8 +160,8 @@ public class RestfulBookerTest {
 
         String corpoAtualizacao = """
             {
-                "firstname" : "Maria",
-                "lastname" : "Pereira",
+                "firstname" : "Neymar",
+                "lastname" : "da Silva",
                 "totalprice" : 180,
                 "depositpaid" : true,
                 "bookingdates" : {
@@ -180,7 +180,7 @@ public class RestfulBookerTest {
                 .put("/booking/" + bookingId)
                 .then()
                 .statusCode(200)
-                .body("lastname", equalTo("Pereira"));
+                .body("lastname", equalTo("da Silva"));
     }
 //FALHAS---------------------------------------------------------------------------------------
     @Test
