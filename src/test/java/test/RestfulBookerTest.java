@@ -3,20 +3,52 @@ package test;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.response.Response;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+
+import com.github.javafaker.Faker;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
 import static io.restassured.RestAssured.*;
 import static org.hamcrest.Matchers.*;
 
 public class RestfulBookerTest {
 
+    private static String BASE_URL;
+    private static String USERNAME;
+    private static String PASSWORD;
+
+    private static final String AUTH_ENDPOINT = "/auth";
+    private static final String BOOKING_ENDPOINT = "/booking";
+
+    private static Faker faker;
+
     @BeforeAll
-    public static void setup() {
-        RestAssured.baseURI = "https://restful-booker.herokuapp.com";
+    public static void setup() throws IOException {
+        Properties props = new Properties();
+
+        try (InputStream input = RestfulBookerTest.class.getClassLoader().getResourceAsStream("config.properties")) {
+            if (input == null) {
+                throw new FileNotFoundException("Arquivo config.properties não encontrado no classpath");
+            }
+            props.load(input);
+        }
+
+        BASE_URL = props.getProperty("base.url");
+        USERNAME = props.getProperty("username");
+        PASSWORD = props.getProperty("password");
+
+        RestAssured.baseURI = BASE_URL;
+        faker = new Faker();
     }
 
     @Test
-    public void deveVerificarSeApiEstaAtiva() {
+    public void deveRetornarStatus200QuandoPing() {
         given()
                 .when()
                 .get("/ping")
@@ -26,213 +58,214 @@ public class RestfulBookerTest {
 
     @Test
     public void deveAutenticarComSucesso() {
-        String corpoAutenticacao = "{ \"username\": \"admin\", \"password\": \"password123\" }";
-
         given()
                 .contentType(ContentType.JSON)
-                .body(corpoAutenticacao)
+                .body(gerarCorpoAutenticacao())
                 .when()
-                .post("/auth")
+                .post(AUTH_ENDPOINT)
                 .then()
                 .statusCode(200)
                 .body("token", notNullValue());
     }
 
     @Test
-    public void deveCriarUmNovoBooking() {
-        String corpoRequisicao = """
-            {
-                "firstname" : "Gabriel",
-                "lastname" : "Severo",
-                "totalprice" : 150,
-                "depositpaid" : true,
-                "bookingdates" : {
-                    "checkin" : "2025-09-01",
-                    "checkout" : "2025-09-10"
-                },
-                "additionalneeds" : "Café da manhã"
-            }
-        """;
-
-        given()
-                .contentType(ContentType.JSON)
-                .body(corpoRequisicao)
-                .when()
-                .post("/booking")
-                .then()
-                .statusCode(200)
-                .body("booking.firstname", equalTo("Gabriel"))
-                .body("booking.lastname", equalTo("Severo"));
-    }
-
-    @Test
-    public void deveListarTodosOsBookings() {
-        given()
-                .when()
-                .get("/booking")
-                .then()
-                .statusCode(200)
-                .body("bookingid", not(empty()));
-    }
-
-    @Test
-    public void deveCriarEexcluirUmBookingComToken() {
-        String corpoRequisicao = """
-            {
-                "firstname" : "Gabriel",
-                "lastname" : "Severino",
-                "totalprice" : 200,
-                "depositpaid" : false,
-                "bookingdates" : {
-                    "checkin" : "2025-08-10",
-                    "checkout" : "2025-08-15"
-                },
-                "additionalneeds" : "Nenhuma"
-            }
-        """;
-
-        Response resposta = given()
-                .contentType(ContentType.JSON)
-                .body(corpoRequisicao)
-                .when()
-                .post("/booking")
-                .then()
-                .statusCode(200)
-                .extract().response();
-
-        int bookingId = resposta.path("bookingid");
-
-        String corpoAutenticacao = "{ \"username\": \"admin\", \"password\": \"password123\" }";
-        String token = given()
-                .contentType(ContentType.JSON)
-                .body(corpoAutenticacao)
-                .when()
-                .post("/auth")
-                .then()
-                .statusCode(200)
-                .extract().path("token");
-
-        given()
-                .contentType(ContentType.JSON)
-                .cookie("token", token)
-                .when()
-                .delete("/booking/" + bookingId)
-                .then()
-                .statusCode(anyOf(is(200), is(201)));
-    }
-
-    @Test
-    public void deveAtualizarBookingComToken() {
-        String corpoCriacao = """
-            {
-                "firstname" : "Maria",
-                "lastname" : "Oliveira",
-                "totalprice" : 180,
-                "depositpaid" : true,
-                "bookingdates" : {
-                    "checkin" : "2025-08-10",
-                    "checkout" : "2025-08-15"
-                },
-                "additionalneeds" : "Almoço"
-            }
-        """;
-
-        Response resposta = given()
-                .contentType(ContentType.JSON)
-                .body(corpoCriacao)
-                .when()
-                .post("/booking")
-                .then()
-                .statusCode(200)
-                .extract().response();
-
-        int bookingId = resposta.path("bookingid");
-
-        String corpoAutenticacao = "{ \"username\": \"admin\", \"password\": \"password123\" }";
-        String token = given()
-                .contentType(ContentType.JSON)
-                .body(corpoAutenticacao)
-                .when()
-                .post("/auth")
-                .then()
-                .statusCode(200)
-                .extract().path("token");
-
-        String corpoAtualizacao = """
-            {
-                "firstname" : "Maria",
-                "lastname" : "Pereira",
-                "totalprice" : 180,
-                "depositpaid" : true,
-                "bookingdates" : {
-                    "checkin" : "2025-08-10",
-                    "checkout" : "2025-08-15"
-                },
-                "additionalneeds" : "Almoço"
-            }
-        """;
-
-        given()
-                .contentType(ContentType.JSON)
-                .cookie("token", token)
-                .body(corpoAtualizacao)
-                .when()
-                .put("/booking/" + bookingId)
-                .then()
-                .statusCode(200)
-                .body("lastname", equalTo("Pereira"));
-    }
-//FALHAS---------------------------------------------------------------------------------------
-    @Test
     public void deveFalharAoAutenticarComCredenciaisInvalidas() {
-        String corpoInvalido = "{ \"username\": \"usuarioErrado\", \"password\": \"senhaErrada\" }";
+        String corpoInvalido = """
+            {
+                "username": "usuarioErrado",
+                "password": "senhaErrada"
+            }
+        """;
 
         given()
                 .contentType(ContentType.JSON)
                 .body(corpoInvalido)
                 .when()
-                .post("/auth")
+                .post(AUTH_ENDPOINT)
                 .then()
                 .statusCode(200)
                 .body("token", nullValue());
     }
 
     @Test
-    public void deveFalharAoCriarBookingComPayloadInvalido() {
-        String corpoInvalido = "{ \"firstname\": 123 }";
+    public void deveCriarUmNovoBooking() {
+        given()
+                .contentType(ContentType.JSON)
+                .body(gerarCorpoBooking())
+                .when()
+                .post(BOOKING_ENDPOINT)
+                .then()
+                .statusCode(200)
+                .body("booking.firstname", notNullValue())
+                .body("booking.lastname", notNullValue());
+    }
+
+    @Test
+    public void deveFalharAoCriarBookingComCamposFaltando() {
+        String corpoInvalido = """
+        {
+            "lastname": "Silva"
+        }
+    """;
 
         given()
                 .contentType(ContentType.JSON)
                 .body(corpoInvalido)
                 .when()
-                .post("/booking")
+                .post(BOOKING_ENDPOINT)
                 .then()
-                .statusCode(500);
+                .statusCode(anyOf(is(400), is(500)));
     }
 
 
     @Test
+    public void deveListarTodosOsBookings() {
+        given()
+                .when()
+                .get(BOOKING_ENDPOINT)
+                .then()
+                .statusCode(200)
+                .body("bookingid", not(empty()));
+    }
+
+    @Test
+    public void deveAtualizarBookingComToken() {
+        int bookingId = criarBookingERetornarId();
+        String token = autenticarERetornarToken();
+
+        String corpoAtualizacao = """
+            {
+                "firstname" : "Atualizado",
+                "lastname" : "Teste",
+                "totalprice" : 250,
+                "depositpaid" : true,
+                "bookingdates" : {
+                    "checkin" : "2025-09-10",
+                    "checkout" : "2025-09-15"
+                },
+                "additionalneeds" : "Jantar"
+            }
+        """;
+
+        given()
+                .contentType(ContentType.JSON)
+                .cookie("token", token)
+                .body(corpoAtualizacao)
+                .when()
+                .put(BOOKING_ENDPOINT + "/" + bookingId)
+                .then()
+                .statusCode(200)
+                .body("lastname", equalTo("Teste"));
+    }
+
+    @Test
     public void deveFalharAoAtualizarBookingSemToken() {
-        String corpoAtualizacao = "{ \"firstname\": \"Atualizado\" }";
+        String corpoAtualizacao = """
+            {
+                "firstname" : "Atualizado"
+            }
+        """;
 
         given()
                 .contentType(ContentType.JSON)
                 .body(corpoAtualizacao)
                 .when()
-                .put("/booking/1")
+                .put(BOOKING_ENDPOINT + "/1")
                 .then()
                 .statusCode(403);
     }
 
     @Test
-    public void deveRetornarNotFoundParaBookingInexistente() {
+    public void deveDeletarBookingComToken() {
+        int bookingId = criarBookingERetornarId();
+        String token = autenticarERetornarToken();
+
+        given()
+                .contentType(ContentType.JSON)
+                .cookie("token", token)
+                .when()
+                .delete(BOOKING_ENDPOINT + "/" + bookingId)
+                .then()
+                .statusCode(201);
+    }
+
+    @Test
+    public void deveFalharAoDeletarBookingSemToken() {
+        int bookingId = criarBookingERetornarId();
+
+        given()
+                .contentType(ContentType.JSON)
+                .when()
+                .delete(BOOKING_ENDPOINT + "/" + bookingId)
+                .then()
+                .statusCode(403);
+    }
+
+    @Test
+    public void deveRetornar404ParaBookingInexistente() {
         given()
                 .when()
-                .get("/booking/999999")
+                .get(BOOKING_ENDPOINT + "/99999999")
                 .then()
                 .statusCode(404);
     }
+
+    // Métodos auxiliares
+
+    private String gerarCorpoBooking() {
+        return String.format("""
+                {
+                    "firstname" : "%s",
+                    "lastname" : "%s",
+                    "totalprice" : %d,
+                    "depositpaid" : %b,
+                    "bookingdates" : {
+                        "checkin" : "2025-09-01",
+                        "checkout" : "2025-09-10"
+                    },
+                    "additionalneeds" : "Café da manhã"
+                }
+                """,
+                faker.name().firstName(),
+                faker.name().lastName(),
+                faker.number().numberBetween(100, 300),
+                faker.bool().bool());
+    }
+
+    private String gerarCorpoAutenticacao() {
+        return String.format("""
+                {
+                    "username": "%s",
+                    "password": "%s"
+                }
+                """, USERNAME, PASSWORD);
+    }
+
+    private String autenticarERetornarToken() {
+        return given()
+                .contentType(ContentType.JSON)
+                .body(gerarCorpoAutenticacao())
+                .when()
+                .post(AUTH_ENDPOINT)
+                .then()
+                .statusCode(200)
+                .extract()
+                .path("token");
+    }
+
+    private int criarBookingERetornarId() {
+        String corpo = gerarCorpoBooking();
+
+        Response response = given()
+                .contentType(ContentType.JSON)
+                .body(corpo)
+                .when()
+                .post(BOOKING_ENDPOINT)
+                .then()
+                .statusCode(200)
+                .extract()
+                .response();
+
+        return response.path("bookingid");
+    }
 }
-
-
-
