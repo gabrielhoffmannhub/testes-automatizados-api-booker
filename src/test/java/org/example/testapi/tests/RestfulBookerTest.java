@@ -1,13 +1,11 @@
-package test;
+package org.example.testapi.tests;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
-import io.restassured.response.Response;
-
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import com.github.javafaker.Faker;
+import org.example.testapi.BookingFactory;
+import org.example.testapi.BookingService;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -26,8 +24,6 @@ public class RestfulBookerTest {
     private static final String AUTH_ENDPOINT = "/auth";
     private static final String BOOKING_ENDPOINT = "/booking";
 
-    private static Faker faker;
-
     @BeforeAll
     public static void setup() throws IOException {
         Properties props = new Properties();
@@ -44,7 +40,6 @@ public class RestfulBookerTest {
         PASSWORD = props.getProperty("password");
 
         RestAssured.baseURI = BASE_URL;
-        faker = new Faker();
     }
 
     @Test
@@ -60,7 +55,7 @@ public class RestfulBookerTest {
     public void deveAutenticarComSucesso() {
         given()
                 .contentType(ContentType.JSON)
-                .body(gerarCorpoAutenticacao())
+                .body(BookingFactory.gerarCorpoAutenticacao(USERNAME, PASSWORD))
                 .when()
                 .post(AUTH_ENDPOINT)
                 .then()
@@ -70,16 +65,9 @@ public class RestfulBookerTest {
 
     @Test
     public void deveFalharAoAutenticarComCredenciaisInvalidas() {
-        String corpoInvalido = """
-            {
-                "username": "usuarioErrado",
-                "password": "senhaErrada"
-            }
-        """;
-
         given()
                 .contentType(ContentType.JSON)
-                .body(corpoInvalido)
+                .body(BookingFactory.gerarCorpoAutenticacao("usuarioErrado", "senhaErrada"))
                 .when()
                 .post(AUTH_ENDPOINT)
                 .then()
@@ -91,7 +79,7 @@ public class RestfulBookerTest {
     public void deveCriarUmNovoBooking() {
         given()
                 .contentType(ContentType.JSON)
-                .body(gerarCorpoBooking())
+                .body(BookingFactory.gerarCorpoBooking())
                 .when()
                 .post(BOOKING_ENDPOINT)
                 .then()
@@ -106,7 +94,7 @@ public class RestfulBookerTest {
         {
             "lastname": "Silva"
         }
-    """;
+        """;
 
         given()
                 .contentType(ContentType.JSON)
@@ -116,7 +104,6 @@ public class RestfulBookerTest {
                 .then()
                 .statusCode(anyOf(is(400), is(500)));
     }
-
 
     @Test
     public void deveListarTodosOsBookings() {
@@ -130,8 +117,8 @@ public class RestfulBookerTest {
 
     @Test
     public void deveAtualizarBookingComToken() {
-        int bookingId = criarBookingERetornarId();
-        String token = autenticarERetornarToken();
+        int bookingId = BookingService.criarBookingERetornarId();
+        String token = BookingService.autenticarERetornarToken();
 
         String corpoAtualizacao = """
             {
@@ -177,8 +164,8 @@ public class RestfulBookerTest {
 
     @Test
     public void deveDeletarBookingComToken() {
-        int bookingId = criarBookingERetornarId();
-        String token = autenticarERetornarToken();
+        int bookingId = BookingService.criarBookingERetornarId();
+        String token = BookingService.autenticarERetornarToken();
 
         given()
                 .contentType(ContentType.JSON)
@@ -191,7 +178,7 @@ public class RestfulBookerTest {
 
     @Test
     public void deveFalharAoDeletarBookingSemToken() {
-        int bookingId = criarBookingERetornarId();
+        int bookingId = BookingService.criarBookingERetornarId();
 
         given()
                 .contentType(ContentType.JSON)
@@ -208,64 +195,5 @@ public class RestfulBookerTest {
                 .get(BOOKING_ENDPOINT + "/99999999")
                 .then()
                 .statusCode(404);
-    }
-
-    // Métodos auxiliares
-
-    private String gerarCorpoBooking() {
-        return String.format("""
-                {
-                    "firstname" : "%s",
-                    "lastname" : "%s",
-                    "totalprice" : %d,
-                    "depositpaid" : %b,
-                    "bookingdates" : {
-                        "checkin" : "2025-09-01",
-                        "checkout" : "2025-09-10"
-                    },
-                    "additionalneeds" : "Café da manhã"
-                }
-                """,
-                faker.name().firstName(),
-                faker.name().lastName(),
-                faker.number().numberBetween(100, 300),
-                faker.bool().bool());
-    }
-
-    private String gerarCorpoAutenticacao() {
-        return String.format("""
-                {
-                    "username": "%s",
-                    "password": "%s"
-                }
-                """, USERNAME, PASSWORD);
-    }
-
-    private String autenticarERetornarToken() {
-        return given()
-                .contentType(ContentType.JSON)
-                .body(gerarCorpoAutenticacao())
-                .when()
-                .post(AUTH_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-                .path("token");
-    }
-
-    private int criarBookingERetornarId() {
-        String corpo = gerarCorpoBooking();
-
-        Response response = given()
-                .contentType(ContentType.JSON)
-                .body(corpo)
-                .when()
-                .post(BOOKING_ENDPOINT)
-                .then()
-                .statusCode(200)
-                .extract()
-                .response();
-
-        return response.path("bookingid");
     }
 }
