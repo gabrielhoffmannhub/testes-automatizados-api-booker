@@ -1,4 +1,4 @@
-# Testes Automatizados da API Restful Booker
+# Teste Automatizado da API Restful Booker
 
 ## Sobre o projeto
 
